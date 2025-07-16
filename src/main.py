@@ -1,3 +1,5 @@
+# ITK part
+
 import itk
 import matplotlib.pyplot as plt
 
@@ -45,10 +47,10 @@ itk.imwrite(resampler, "aligned.nrrd")
 
 # Segmentation image 1
 
-#if ginput dos not work 
+# If ginput does not work
 seedX=110
 seedY=100
-lower=190 
+lower=190
 upper=255
 
 input_image = itk.imread("aligned.nrrd", pixel_type=itk.F)
@@ -61,7 +63,7 @@ smoothed_image = smoother.GetOutput()
 
 plt.ion()
 plt.imshow(smoother.GetOutput()[0], cmap="gray")
-seedY, seedX = plt.ginput()[0]
+# seedY, seedX = plt.ginput()[0]
 seedX, seedY = int(seedX), int(seedY)
 print("Seed coordinates : ", seedX, seedY)
 
@@ -86,14 +88,13 @@ dimension = input_image.GetImageDimension()
 
 in_type = itk.output(connected_threshold)
 output_type = itk.Image[itk.UC, dimension]
-rescaler = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold)
-rescaler.SetOutputMinimum(0)
-rescaler.SetOutputMaximum(255)
-rescaler.Update()
+segmentation_image_rescaler = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold)
+segmentation_image_rescaler.SetOutputMinimum(0)
+segmentation_image_rescaler.SetOutputMaximum(255)
+segmentation_image_rescaler.Update()
 
-output_filepath = "segmentation.nrrd"
-itk.imwrite(rescaler, output_filepath)
-
+# output_filepath = "segmentation.nrrd"
+# itk.imwrite(rescaler, output_filepath)
 
 # Segmentation image 2
 
@@ -135,14 +136,31 @@ dimension = gre1.GetImageDimension()
 
 in_type = itk.output(connected_threshold)
 output_type = itk.Image[itk.UC, dimension]
-rescaler = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold)
-rescaler.SetOutputMinimum(0)
-rescaler.SetOutputMaximum(255)
-rescaler.Update()
+segmentation_image_rescaler = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold)
+segmentation_image_rescaler.SetOutputMinimum(0)
+segmentation_image_rescaler.SetOutputMaximum(255)
+segmentation_image_rescaler.Update()
 
-output_filepath = "segmentation2.nrrd"
-itk.imwrite(rescaler, output_filepath)
+# output_filepath = "segmentation2.nrrd"
+# itk.imwrite(rescaler, output_filepath)
 
+def itk_to_vtk(itk_image):
+    np_array = itk.GetArrayFromImage(itk_image)
+    shape = np_array.shape  # z, y, x
+    vtk_array = itk.utils.numpy_support.numpy_to_vtk(np_array.ravel(order='F'), deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+
+    img = vtk.vtkImageData()
+    img.SetDimensions(shape[2], shape[1], shape[0])
+    img.GetPointData().SetScalars(vtk_array)
+
+    spacing = itk_image.GetSpacing()
+    origin = itk_image.GetOrigin()
+    img.SetSpacing(spacing)
+    img.SetOrigin(origin)
+
+    return img
+
+# VTK part
 
 # Affichage
 
@@ -166,10 +184,12 @@ reader.Update()
 # Affichage du scan en transparent
 opacityFun = vtk.vtkPiecewiseFunction()
 opacityFun.AddPoint(0, 0.0)
-opacityFun.AddPoint(100, 0.0)
-opacityFun.AddPoint(200, 0.05)
-opacityFun.AddPoint(210, 0.0)
-opacityFun.AddPoint(255, 0.0)
+opacityFun.AddPoint(40, 0.0)
+opacityFun.AddPoint(100, 0.01)
+opacityFun.AddPoint(150, 0.03)
+opacityFun.AddPoint(200, 0.08)
+opacityFun.AddPoint(255, 0.1)
+
 
 colorFun = vtk.vtkColorTransferFunction()
 colorFun.AddRGBPoint(0, 0.0, 0.0, 0.0)
@@ -222,7 +242,8 @@ reader2.Update()
 
 opacityTumor = vtk.vtkPiecewiseFunction()
 opacityTumor.AddPoint(0, 0.0)
-opacityTumor.AddPoint(255, 1.0)
+opacityTumor.AddPoint(100, 0.4)
+opacityTumor.AddPoint(255, 0.5)
 
 colorTumor = vtk.vtkColorTransferFunction()
 colorTumor.AddRGBPoint(0, 0.0, 0.0, 0.0)
@@ -233,6 +254,11 @@ propertyTumor.SetColor(colorTumor)
 propertyTumor.SetScalarOpacity(opacityTumor)
 propertyTumor.SetInterpolationTypeToLinear()
 
+propertyTumor.ShadeOn()
+propertyTumor.SetAmbient(0.3)
+propertyTumor.SetDiffuse(0.6)
+propertyTumor.SetSpecular(0.1)
+
 mapperTumor = vtk.vtkSmartVolumeMapper()
 mapperTumor.SetInputConnection(reader2.GetOutputPort())
 
@@ -242,8 +268,8 @@ volumeTumor.SetMapper(mapperTumor)
 
 
 renderer.AddVolume(volume)
-renderer.AddVolume(volumeTumor2)
 renderer.AddVolume(volumeTumor)
+renderer.AddVolume(volumeTumor2)
 
 renwin.Render()
 interactor.Start()
