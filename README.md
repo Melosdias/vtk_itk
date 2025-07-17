@@ -53,4 +53,7 @@ For both images, a histogram normalization is computed using `itk.ConnectedThres
 
 This allows for a zone next to the seed point and close (in terms of pixel intensity) to the seed point to be replaced by white, and the rest is in black.
 
-The result is then display with `matplotlib.pyplot`.
+The result is then displayed with `matplotlib.pyplot`.
+
+### Visualization with `vtk`
+
