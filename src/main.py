@@ -3,51 +3,54 @@
 import itk
 import matplotlib.pyplot as plt
 
-# fixed_image = itk.imread("Data/case6_gre1.nrrd", itk.F)
-# moving_image = itk.imread("Data/case6_gre2.nrrd", itk.F)
-#
-# dimension = 3
-# FixedImageType = type(fixed_image)
-# MovingImageType = type(moving_image)
-#
-#
-# TransformType = itk.TranslationTransform[itk.D, dimension]
-# transform = TransformType.New()
-#
-# optimizer = itk.RegularStepGradientDescentOptimizerv4.New(
-#     LearningRate=1.0,
-#     MinimumStepLength=0.001,
-#     NumberOfIterations=200,
-# )
-#
-#
-# metric = itk.MeanSquaresImageToImageMetricv4[FixedImageType, MovingImageType].New()
-#
-# registration = itk.ImageRegistrationMethodv4[FixedImageType, MovingImageType].New(
-#     Metric=metric,
-#     Optimizer=optimizer,
-#     FixedImage=fixed_image,
-#     MovingImage=moving_image,
-#     InitialTransform=transform,
-# )
-#
-# registration.Update()
-#
-# resampler = itk.ResampleImageFilter.New(
-#     Input=moving_image,
-#     Transform=registration.GetTransform(),
-#     UseReferenceImage=True,
-#     ReferenceImage=fixed_image,
-#     DefaultPixelValue=0,
-# )
-# resampled_image = resampler.Update()
-#
-# itk.imwrite(resampler, "aligned.nrrd")
+# Align the second set of images to the first one
 
-# Reading images
+print("Aligning ./Data/case6_gre2.nrrd with ./Data/case6_gre1.nrrd...")
+
+fixed_image = itk.imread("Data/case6_gre1.nrrd", itk.F)
+moving_image = itk.imread("Data/case6_gre2.nrrd", itk.F)
+
+dimension = 3
+FixedImageType = type(fixed_image)
+MovingImageType = type(moving_image)
+
+TransformType = itk.TranslationTransform[itk.D, dimension]
+transform = TransformType.New()
+
+optimizer = itk.RegularStepGradientDescentOptimizerv4.New(
+    LearningRate=1.0,
+    MinimumStepLength=0.001,
+    NumberOfIterations=200,
+)
+
+metric = itk.MeanSquaresImageToImageMetricv4[FixedImageType, MovingImageType].New()
+
+registration = itk.ImageRegistrationMethodv4[FixedImageType, MovingImageType].New(
+    Metric=metric,
+    Optimizer=optimizer,
+    FixedImage=fixed_image,
+    MovingImage=moving_image,
+    InitialTransform=transform,
+)
+
+registration.Update()
+
+resampler = itk.ResampleImageFilter.New(
+    Input=moving_image,
+    Transform=registration.GetTransform(),
+    UseReferenceImage=True,
+    ReferenceImage=fixed_image,
+    DefaultPixelValue=0,
+)
+resampler.Update()
+
+print("Writing ./case6_gre2_aligned.nrrd...")
+itk.imwrite(resampler, "case6_gre2_aligned.nrrd")
+
+# Loading images
 
 # First set of images
-print("Reading Data/case6_gre1.nrrd...")
+print("Loading Data/case6_gre1.nrrd...")
 
 input_image1 = itk.imread("Data/case6_gre1.nrrd", pixel_type=itk.F)
 smoother1 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image1, NumberOfIterations=20, TimeStep=0.04,
@@ -56,49 +59,25 @@ smoother1 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image1, 
 smoother1.Update()
 smoothed_image1 = smoother1.GetOutput()
 
-y_offset = 15
-# Crop the bottom part
-crop1 = itk.CropImageFilter.New(Input=smoothed_image1)
-crop1.SetLowerBoundaryCropSize([0, 0, 0])
-crop1.SetUpperBoundaryCropSize([0, y_offset, 0])
-crop1.Update()
+output_filepath1 = "new_case6_gre1.nrrd"
+itk.imwrite(smoothed_image1, output_filepath1)
 
-cropped_smoothed_image1 = crop1.GetOutput()
-
-in_type_cropped1 = itk.output(crop1)
-output_type_cropped1 = itk.Image[itk.UC, cropped_smoothed_image1.GetImageDimension()]
-cropped_rescaler1 = itk.RescaleIntensityImageFilter[in_type_cropped1, output_type_cropped1].New(Input=crop1)
-cropped_rescaler1.SetOutputMinimum(0)
-cropped_rescaler1.SetOutputMaximum(255)
-cropped_rescaler1.Update()
-
-cropped_output_filepath1 = "cropped_case6_gre1.nrrd"
-itk.imwrite(cropped_rescaler1, cropped_output_filepath1)
-
-cropped_smoothed_image_array1 = itk.GetArrayViewFromImage(cropped_smoothed_image1)
+smoothed_image_array1 = itk.GetArrayViewFromImage(smoothed_image1)
 
 # Second set of images
-print("Reading Data/case6_gre2.nrrd...")
+print("Loading case6_gre2_aligned.nrrd...")
 
-input_image2 = itk.imread("./Data/case6_gre2.nrrd", itk.F)
+input_image2 = itk.imread("case6_gre2_aligned.nrrd", itk.F)
 smoother2 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image2, NumberOfIterations=20, TimeStep=0.04,
                                                             ConductanceParameter=3)
 smoother2.Update()
 smoothed_image2 = smoother2.GetOutput()
 
-# y_offset = 20
-# Crop the top part
-crop2 = itk.CropImageFilter.New(Input=smoothed_image2)
-crop2.SetLowerBoundaryCropSize([0, y_offset, 0])
-crop2.SetUpperBoundaryCropSize([0, 0, 0])
-crop2.Update()
+smoothed_image_array2 = itk.GetArrayViewFromImage(smoothed_image2)
 
-cropped_smoothed_image2 = crop2.GetOutput()
-cropped_smoothed_image_array2 = itk.GetArrayViewFromImage(cropped_smoothed_image2)
-
-print(cropped_smoothed_image_array1.shape, cropped_smoothed_image_array2.shape)
-assert cropped_smoothed_image_array1.shape == cropped_smoothed_image_array2.shape, "Image array dimensions don't match after cropping!"
-assert cropped_smoothed_image1.GetBufferedRegion().GetSize() == cropped_smoothed_image2.GetBufferedRegion().GetSize(), "Image dimensions don't match after cropping!"
+print(smoothed_image_array1.shape, smoothed_image_array2.shape)
+assert smoothed_image_array1.shape == smoothed_image_array2.shape, "Image array dimensions don't match after aligning and smoothing!"
+assert smoothed_image1.GetBufferedRegion().GetSize() == smoothed_image2.GetBufferedRegion().GetSize(), "Image dimensions don't match after aligning and smoothing!"
 
 # User interaction part
 
@@ -107,7 +86,7 @@ seedY = 100
 lower = 190
 upper = 255
 
-current_z = cropped_smoothed_image_array1.shape[0] // 2
+current_z = smoothed_image_array1.shape[0] // 2
 seed_coords = None
 seed_marker1 = None
 seed_marker2 = None
@@ -115,25 +94,25 @@ seed_marker2 = None
 fig, ax = plt.subplots(1, 2, figsize=(10, 8))
 plt.subplots_adjust(bottom=0.25)
 
-im1 = ax[0].imshow(cropped_smoothed_image_array1[current_z], cmap="gray")
+im1 = ax[0].imshow(smoothed_image_array1[current_z], cmap="gray")
 ax[0].axis("off")
 ax[0].title.set_text("First set of images")
-im2 = ax[1].imshow(cropped_smoothed_image_array2[current_z], cmap="gray")
+im2 = ax[1].imshow(smoothed_image_array2[current_z], cmap="gray")
 ax[1].axis("off")
 ax[1].title.set_text("Second set of images")
 
 fig.suptitle(f"Select seed point - Slice {current_z}")
 
 ax_slider = plt.axes([0.2, 0.1, 0.6, 0.03])
-slider = plt.Slider(ax_slider, 'Z-slice', 0, cropped_smoothed_image_array1.shape[0] - 1,
+slider = plt.Slider(ax_slider, 'Z-slice', 0, smoothed_image_array1.shape[0] - 1,
                     valinit=current_z, valfmt='%d')
 
 
 def update_slice(val):
     global current_z, seed_marker1, seed_marker2
     current_z = int(slider.val)
-    im1.set_array(cropped_smoothed_image_array1[current_z])
-    im2.set_array(cropped_smoothed_image_array2[current_z])
+    im1.set_array(smoothed_image_array1[current_z])
+    im2.set_array(smoothed_image_array2[current_z])
     fig.suptitle(f"Seed selected at ({seedX}, {seedY}) - Slice {current_z}")
 
     # Clear seed marker when changing slices
@@ -152,12 +131,10 @@ def on_click(event):
     if event.button != 1 or event.xdata is None or event.ydata is None:
         return
 
-    # print(event)
-
     x, y = int(event.xdata), int(event.ydata)
     seed_coords = (x, y, current_z)
 
-    # Clear seed marker when changing slices
+    # Clear seed marker when changing marker position
     if seed_marker1:
         seed_marker1.remove()
         seed_marker1 = None
@@ -165,21 +142,18 @@ def on_click(event):
         seed_marker2.remove()
         seed_marker2 = None
 
-    # Add new marker
     seed_marker1 = ax[0].plot(x, y, 'r+')[0]
     seed_marker2 = ax[1].plot(x, y, 'r+')[0]
 
     fig.suptitle(f"Seed selected at ({x}, {y}) - Slice {current_z}")
     fig.canvas.draw()
 
-    # print(x, y, current_z)
 
-
-# Connect events
+# Handling of user events (slider and clicks)
 slider.on_changed(update_slice)
 fig.canvas.mpl_connect('button_press_event', on_click)
 
-# Instructions
+# Slider instructions
 fig.text(0.5, 0.02, 'Use slider to navigate slices, left-click to select seed, close window when done',
          ha='center', fontsize=10)
 
@@ -188,27 +162,25 @@ plt.show()
 # Get final coordinates
 if seed_coords:
     seedX, seedY, seedZ = seed_coords
-    print(f"Final seed coordinates: X={seedX}, Y={seedY}, Z={seedZ}")
 else:
     print("No seed selected, using defaults")
     seedZ = current_z
-    print(f"Using Z slice: {seedZ}")
 
-# Old way
-# seedX, seedY = plt.ginput()[0]
+print(f"Final seed coordinates: X={seedX}, Y={seedY}, Z={seedZ}")
 
 print("Waiting for the segmentation of the images...")
 
 # Segmentation image 1
 
-initial_value1 = cropped_smoothed_image1.GetPixel((seedX, seedY, seedZ))
+initial_value1 = smoothed_image1.GetPixel((seedX, seedY, seedZ))
 lower1 = initial_value1 - 10
 upper1 = initial_value1 + 30
 
-print("initial_value1 : ", initial_value1)
-print("lower1, upper1 : ", lower1, upper1)
+print("Segmenting first set of images...")
+# print("initial_value1 : ", initial_value1)
+# print("lower1, upper1 : ", lower1, upper1)
 
-connected_threshold1 = itk.ConnectedThresholdImageFilter.New(Input=cropped_smoothed_image1)
+connected_threshold1 = itk.ConnectedThresholdImageFilter.New(Input=smoothed_image1)
 connected_threshold1.SetReplaceValue(255)
 connected_threshold1.SetLower(lower1)
 connected_threshold1.SetUpper(upper1)
@@ -226,24 +198,25 @@ segmentation_image_rescaler1.SetOutputMaximum(255)
 segmentation_image_rescaler1.Update()
 
 output_filepath1 = "segmentation.nrrd"
-itk.imwrite(segmentation_image_rescaler1, output_filepath1)
+itk.imwrite(segmentation_image_rescaler1.GetOutput(), output_filepath1)
 
 # Segmentation image 2
 
-initial_value2 = cropped_smoothed_image2.GetPixel((seedX, seedY + y_offset, seedZ))
+initial_value2 = smoothed_image2.GetPixel((seedX, seedY, seedZ))
 lower2 = initial_value2 - 10
 upper2 = initial_value2 + 30
 
-print("initial_value2 : ", initial_value2)
-print("lower2, upper2 : ", lower2, upper2)
+print("Segmenting second set of images...")
+# print("initial_value2 : ", initial_value2)
+# print("lower2, upper2 : ", lower2, upper2)
 
 # Configure filter from the command line arguments
-connected_threshold2 = itk.ConnectedThresholdImageFilter.New(Input=cropped_smoothed_image2)
+connected_threshold2 = itk.ConnectedThresholdImageFilter.New(Input=smoothed_image2)
 connected_threshold2.SetReplaceValue(255)
 connected_threshold2.SetLower(lower2)
 connected_threshold2.SetUpper(upper2)
 
-connected_threshold2.SetSeed((seedX, seedY + y_offset, seedZ))
+connected_threshold2.SetSeed((seedX, seedY, seedZ))
 connected_threshold2.Update()
 
 dimension2 = input_image2.GetImageDimension()
@@ -256,7 +229,7 @@ segmentation_image_rescaler2.SetOutputMaximum(255)
 segmentation_image_rescaler2.Update()
 
 output_filepath2 = "segmentation2.nrrd"
-itk.imwrite(segmentation_image_rescaler2, output_filepath2)
+itk.imwrite(segmentation_image_rescaler2.GetOutput(), output_filepath2)
 
 # Show the segmented images
 
@@ -338,6 +311,11 @@ property.SetColor(colorFun)
 property.SetScalarOpacity(opacityFun)
 property.SetInterpolationTypeToLinear()
 
+property.ShadeOn()
+property.SetAmbient(0.3)
+property.SetDiffuse(0.6)
+property.SetSpecular(0.1)
+
 mapper = vtk.vtkSmartVolumeMapper()
 mapper.SetInputConnection(reader.GetOutputPort())
 
@@ -363,11 +341,6 @@ propertyTumor = vtk.vtkVolumeProperty()
 propertyTumor.SetColor(colorTumor)
 propertyTumor.SetScalarOpacity(opacityTumor)
 propertyTumor.SetInterpolationTypeToLinear()
-
-propertyTumor.ShadeOn()
-propertyTumor.SetAmbient(0.3)
-propertyTumor.SetDiffuse(0.6)
-propertyTumor.SetSpecular(0.1)
 
 mapperTumor = vtk.vtkSmartVolumeMapper()
 mapperTumor.SetInputConnection(reader2.GetOutputPort())
