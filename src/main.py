@@ -59,9 +59,6 @@ smoother1 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image1, 
 smoother1.Update()
 smoothed_image1 = smoother1.GetOutput()
 
-output_filepath1 = "new_case6_gre1.nrrd"
-itk.imwrite(smoothed_image1, output_filepath1)
-
 smoothed_image_array1 = itk.GetArrayViewFromImage(smoothed_image1)
 
 # Second set of images
@@ -290,7 +287,7 @@ interactor.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
 renwin.SetInteractor(interactor)
 
 reader = vtk.vtkNrrdReader()
-reader.SetFileName("./cropped_case6_gre1.nrrd")
+reader.SetFileName("./case6_gre2_aligned.nrrd")
 reader.Update()
 
 # Affichage du scan en transparent
