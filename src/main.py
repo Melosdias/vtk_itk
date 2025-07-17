@@ -3,6 +3,7 @@
 import itk
 import matplotlib.pyplot as plt
 
+
 # fixed_image = itk.imread("Data/case6_gre1.nrrd", itk.F)
 # moving_image = itk.imread("Data/case6_gre2.nrrd", itk.F)
 #
@@ -64,13 +65,79 @@ smoother1 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image1, 
 smoother1.Update()
 smoothed_image1 = smoother1.GetOutput()
 
-z = itk.GetArrayViewFromImage(smoothed_image1).shape[0] // 2
+smoothed_image_array = itk.GetArrayViewFromImage(smoothed_image1)
+current_z = smoothed_image_array.shape[0] // 2
+seed_coords = None
+seed_marker = None
+
+fig, ax = plt.subplots(figsize=(10, 8))
+plt.subplots_adjust(bottom=0.25)
+
+im = ax.imshow(smoothed_image_array[current_z], cmap="gray")
+ax.set_title(f"Select seed point - Slice {current_z}")
+
+ax_slider = plt.axes([0.2, 0.1, 0.6, 0.03])
+slider = plt.Slider(ax_slider, 'Z-slice', 0, smoothed_image_array.shape[0]-1, 
+               valinit=current_z, valfmt='%d')
+
+def update_slice(val):
+    global current_z, seed_marker
+    current_z = int(slider.val)
+    im.set_array(smoothed_image_array[current_z])
+    ax.set_title(f"Select seed point - Slice {current_z}")
+    
+    # Clear seed marker when changing slices
+    if seed_marker:
+        seed_marker.remove()
+        seed_marker = None
+    
+    fig.canvas.draw()
+
+def on_click(event):
+    global seed_coords, seed_marker
+    if event.inaxes != ax or event.button != 1:
+        return
+    
+    x, y = int(event.xdata), int(event.ydata)
+    seed_coords = (x, y, current_z)
+    
+    # Clear previous marker
+    if seed_marker:
+        seed_marker.remove()
+    
+    # Add new marker
+    seed_marker = ax.plot(x, y, 'ro', markersize=8, markerfacecolor='none', 
+                         markeredgewidth=2)[0]
+    
+    ax.set_title(f"Seed selected at ({x}, {y}) - Slice {current_z}")
+    fig.canvas.draw()
+    print(f"Seed selected: x={x}, y={y}, z={current_z}")
+
+# Connect events
+slider.on_changed(update_slice)
+fig.canvas.mpl_connect('button_press_event', on_click)
+
+# Instructions
+fig.text(0.5, 0.02, 'Use slider to navigate slices, left-click to select seed, close window when done', 
+         ha='center', fontsize=10)
+
+plt.show()
+
+# Get final coordinates
+if seed_coords:
+    seedX, seedY, seedZ = seed_coords
+    print(f"Final seed coordinates: X={seedX}, Y={seedY}, Z={seedZ}")
+else:
+    print("No seed selected, using defaults")
+    seedZ = current_z
+    print(f"Using Z slice: {seedZ}")
+
 
 # Show first image to select the seed
 plt.ion()
 title = "Waiting for the user to chose a seed (left click)..."
 plt.title(title)
-plt.imshow(smoother1.GetOutput()[z], cmap="gray")
+plt.imshow(smoother1.GetOutput()[seedZ], cmap="gray")
 
 print(title)
 
