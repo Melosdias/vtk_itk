@@ -3,162 +3,173 @@
 import itk
 import matplotlib.pyplot as plt
 
-fixed_image = itk.imread("Data/case6_gre1.nrrd", itk.F)
-moving_image = itk.imread("Data/case6_gre2.nrrd", itk.F)
-
-dimension = 3
-FixedImageType = type(fixed_image)
-MovingImageType = type(moving_image)
-
-
-TransformType = itk.TranslationTransform[itk.D, dimension]
-transform = TransformType.New()
-
-optimizer = itk.RegularStepGradientDescentOptimizerv4.New(
-    LearningRate=1.0,
-    MinimumStepLength=0.001,
-    NumberOfIterations=200,
-)
-
-
-metric = itk.MeanSquaresImageToImageMetricv4[FixedImageType, MovingImageType].New()
-
-registration = itk.ImageRegistrationMethodv4[FixedImageType, MovingImageType].New(
-    Metric=metric,
-    Optimizer=optimizer,
-    FixedImage=fixed_image,
-    MovingImage=moving_image,
-    InitialTransform=transform,
-)
-
-registration.Update()
-
-resampler = itk.ResampleImageFilter.New(
-    Input=moving_image,
-    Transform=registration.GetTransform(),
-    UseReferenceImage=True,
-    ReferenceImage=fixed_image,
-    DefaultPixelValue=0,
-)
-resampled_image = resampler.Update()
-
-itk.imwrite(resampler, "aligned.nrrd")
-
+# fixed_image = itk.imread("Data/case6_gre1.nrrd", itk.F)
+# moving_image = itk.imread("Data/case6_gre2.nrrd", itk.F)
+#
+# dimension = 3
+# FixedImageType = type(fixed_image)
+# MovingImageType = type(moving_image)
+#
+#
+# TransformType = itk.TranslationTransform[itk.D, dimension]
+# transform = TransformType.New()
+#
+# optimizer = itk.RegularStepGradientDescentOptimizerv4.New(
+#     LearningRate=1.0,
+#     MinimumStepLength=0.001,
+#     NumberOfIterations=200,
+# )
+#
+#
+# metric = itk.MeanSquaresImageToImageMetricv4[FixedImageType, MovingImageType].New()
+#
+# registration = itk.ImageRegistrationMethodv4[FixedImageType, MovingImageType].New(
+#     Metric=metric,
+#     Optimizer=optimizer,
+#     FixedImage=fixed_image,
+#     MovingImage=moving_image,
+#     InitialTransform=transform,
+# )
+#
+# registration.Update()
+#
+# resampler = itk.ResampleImageFilter.New(
+#     Input=moving_image,
+#     Transform=registration.GetTransform(),
+#     UseReferenceImage=True,
+#     ReferenceImage=fixed_image,
+#     DefaultPixelValue=0,
+# )
+# resampled_image = resampler.Update()
+#
+# itk.imwrite(resampler, "aligned.nrrd")
 
 # Segmentation image 1
 
 # If ginput does not work
-seedX=110
-seedY=100
-lower=190
-upper=255
+seedX = 110
+seedY = 100
+lower = 190
+upper = 255
 
-input_image = itk.imread("aligned.nrrd", pixel_type=itk.F)
+print("Reading Data/case6_gre1.nrrd...")
 
-smoother = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image, NumberOfIterations=20, TimeStep=0.04,
-                                                           ConductanceParameter=3)
+# input_image = itk.imread("aligned.nrrd", pixel_type=itk.F)
+input_image1 = itk.imread("Data/case6_gre1.nrrd", pixel_type=itk.F)
+print(itk.GetArrayViewFromImage(input_image1).shape)
 
-smoother.Update()
-smoothed_image = smoother.GetOutput()
+smoother1 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image1, NumberOfIterations=20, TimeStep=0.04,
+                                                            ConductanceParameter=3)
 
+smoother1.Update()
+smoothed_image1 = smoother1.GetOutput()
+
+z = itk.GetArrayViewFromImage(smoothed_image1).shape[0] // 2
+
+# Show first image to select the seed
 plt.ion()
-plt.imshow(smoother.GetOutput()[0], cmap="gray")
-# seedY, seedX = plt.ginput()[0]
+title = "Waiting for the user to chose a seed (left click)..."
+plt.title(title)
+plt.imshow(smoother1.GetOutput()[z], cmap="gray")
+
+print(title)
+
+seedX, seedY = plt.ginput()[0]
 seedX, seedY = int(seedX), int(seedY)
-print("Seed coordinates : ", seedX, seedY)
+print("Seed coordinates : ", seedX, seedY, z)
 
+plt.ioff()
+plt.title("Seed selected, waiting for the user to close the window")
+plt.plot([seedX], [seedY], "r+")
+plt.show()
 
-z = 0  
-initial_value = smoothed_image.GetPixel((seedX, seedY, z))
+print("Waiting for the segmentation of the images...")
+
+initial_value = smoothed_image1.GetPixel((seedX, seedY, z))
 lower = initial_value - 10
 upper = initial_value + 30
 
+print("initial value1 : ", initial_value)
+print("lower1, upper1 : ", lower, upper)
 
-connected_threshold = itk.ConnectedThresholdImageFilter.New(smoothed_image)
-connected_threshold.SetReplaceValue(255)
-connected_threshold.SetLower(lower)
-connected_threshold.SetUpper(upper)
+connected_threshold1 = itk.ConnectedThresholdImageFilter.New(smoothed_image1)
+connected_threshold1.SetReplaceValue(255)
+connected_threshold1.SetLower(lower)
+connected_threshold1.SetUpper(upper)
 
-connected_threshold.SetSeed((seedX, seedY, z))
-connected_threshold.Update()
-plt.ion()
-plt.imshow(itk.GetArrayViewFromImage(connected_threshold.GetOutput())[0], cmap="gray")
+connected_threshold1.SetSeed((seedX, seedY, z))
+connected_threshold1.Update()
 
-dimension = input_image.GetImageDimension()
+dimension1 = input_image1.GetImageDimension()
 
-in_type = itk.output(connected_threshold)
-output_type = itk.Image[itk.UC, dimension]
-segmentation_image_rescaler = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold)
-segmentation_image_rescaler.SetOutputMinimum(0)
-segmentation_image_rescaler.SetOutputMaximum(255)
-segmentation_image_rescaler.Update()
+in_type = itk.output(connected_threshold1)
+output_type = itk.Image[itk.UC, dimension1]
+segmentation_image_rescaler1 = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold1)
+segmentation_image_rescaler1.SetOutputMinimum(0)
+segmentation_image_rescaler1.SetOutputMaximum(255)
+segmentation_image_rescaler1.Update()
 
-# output_filepath = "segmentation.nrrd"
-# itk.imwrite(rescaler, output_filepath)
+output_filepath1 = "segmentation.nrrd"
+itk.imwrite(segmentation_image_rescaler1, output_filepath1)
 
 # Segmentation image 2
 
-gre1 = itk.imread("./Data/case6_gre2.nrrd", itk.F)
-smoother = itk.GradientAnisotropicDiffusionImageFilter.New(Input=gre1, NumberOfIterations=20, TimeStep=0.04,
-                                                           ConductanceParameter=3)
+print("Reading Data/case6_gre2.nrrd...")
 
-smoother.Update()
-smoothed_image = smoother.GetOutput()
+input_image2 = itk.imread("./Data/case6_gre2.nrrd", itk.F)
+print(itk.GetArrayViewFromImage(input_image2).shape)
 
-fixed_array = itk.GetArrayViewFromImage(gre1)
-z = fixed_array.shape[0] //2
+smoother2 = itk.GradientAnisotropicDiffusionImageFilter.New(Input=input_image2, NumberOfIterations=20, TimeStep=0.04,
+                                                            ConductanceParameter=3)
+smoother2.Update()
+smoothed_image2 = smoother2.GetOutput()
+
+fixed_array = itk.GetArrayViewFromImage(input_image2)
+z = fixed_array.shape[0] // 2
 
 print("Seed coordinates : ", seedX, seedY, z)
 
 # Instantiate the filter
 
 
-initial_value = smoothed_image.GetPixel((seedX, seedY, z))
+initial_value = smoothed_image2.GetPixel((seedX, seedY, z))
 lower = initial_value - 10
 upper = initial_value + 30
 
-print("initial value : ", smoothed_image.GetPixel((seedX, seedY, z)))
-print("lower, upper : ", lower, upper)
+print("initial value2 : ", initial_value)
+print("lower2, upper2 : ", lower, upper)
 
 # Configure filter from the command line arguments
-connected_threshold = itk.ConnectedThresholdImageFilter.New(smoothed_image)
-connected_threshold.SetReplaceValue(255)
-connected_threshold.SetLower(lower)
-connected_threshold.SetUpper(upper)
+connected_threshold2 = itk.ConnectedThresholdImageFilter.New(smoothed_image2)
+connected_threshold2.SetReplaceValue(255)
+connected_threshold2.SetLower(lower)
+connected_threshold2.SetUpper(upper)
 
-connected_threshold.SetSeed((seedX, seedY, z))
-connected_threshold.Update()
-plt.ion()
-seg_array = itk.GetArrayViewFromImage(connected_threshold.GetOutput())
-plt.imshow(seg_array[z, :, :], cmap="gray")
+connected_threshold2.SetSeed((seedX, seedY, z))
+connected_threshold2.Update()
 
-dimension = gre1.GetImageDimension()
+# Show the segmented image
+plt.title("Seed selected, first and second segmentation")
+plt.subplot(2, 2, 1)
+plt.imshow(itk.GetArrayViewFromImage(connected_threshold1.GetOutput())[z], cmap="gray")
+plt.plot([seedX], [seedY], "r+")
+plt.subplot(2, 2, 2)
+plt.imshow(itk.GetArrayViewFromImage(connected_threshold2.GetOutput())[z], cmap="gray")
+plt.plot([seedX], [seedY], "r+")
 
-in_type = itk.output(connected_threshold)
-output_type = itk.Image[itk.UC, dimension]
-segmentation_image_rescaler = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold)
-segmentation_image_rescaler.SetOutputMinimum(0)
-segmentation_image_rescaler.SetOutputMaximum(255)
-segmentation_image_rescaler.Update()
+plt.show()
 
-# output_filepath = "segmentation2.nrrd"
-# itk.imwrite(rescaler, output_filepath)
+dimension2 = input_image2.GetImageDimension()
 
-def itk_to_vtk(itk_image):
-    np_array = itk.GetArrayFromImage(itk_image)
-    shape = np_array.shape  # z, y, x
-    vtk_array = itk.utils.numpy_support.numpy_to_vtk(np_array.ravel(order='F'), deep=True, array_type=vtk.VTK_UNSIGNED_CHAR)
+in_type = itk.output(connected_threshold2)
+output_type = itk.Image[itk.UC, dimension2]
+segmentation_image_rescaler2 = itk.RescaleIntensityImageFilter[in_type, output_type].New(connected_threshold2)
+segmentation_image_rescaler2.SetOutputMinimum(0)
+segmentation_image_rescaler2.SetOutputMaximum(255)
+segmentation_image_rescaler2.Update()
 
-    img = vtk.vtkImageData()
-    img.SetDimensions(shape[2], shape[1], shape[0])
-    img.GetPointData().SetScalars(vtk_array)
-
-    spacing = itk_image.GetSpacing()
-    origin = itk_image.GetOrigin()
-    img.SetSpacing(spacing)
-    img.SetOrigin(origin)
-
-    return img
+output_filepath2 = "segmentation2.nrrd"
+itk.imwrite(segmentation_image_rescaler2, output_filepath2)
 
 # VTK part
 
@@ -178,7 +189,7 @@ interactor.SetInteractorStyle(vtk.vtkInteractorStyleTrackballCamera())
 renwin.SetInteractor(interactor)
 
 reader = vtk.vtkNrrdReader()
-reader.SetFileName("./aligned.nrrd")
+reader.SetFileName("./Data/case6_gre1.nrrd")
 reader.Update()
 
 # Affichage du scan en transparent
@@ -189,7 +200,6 @@ opacityFun.AddPoint(100, 0.01)
 opacityFun.AddPoint(150, 0.03)
 opacityFun.AddPoint(200, 0.08)
 opacityFun.AddPoint(255, 0.1)
-
 
 colorFun = vtk.vtkColorTransferFunction()
 colorFun.AddRGBPoint(0, 0.0, 0.0, 0.0)
@@ -207,7 +217,6 @@ mapper.SetInputConnection(reader.GetOutputPort())
 volume = vtk.vtkVolume()
 volume.SetProperty(property)
 volume.SetMapper(mapper)
-
 
 # Affichage de la tumeur sur la deuxième segmentation
 reader3 = vtk.vtkNrrdReader()
@@ -254,10 +263,10 @@ propertyTumor.SetColor(colorTumor)
 propertyTumor.SetScalarOpacity(opacityTumor)
 propertyTumor.SetInterpolationTypeToLinear()
 
-propertyTumor.ShadeOn()
-propertyTumor.SetAmbient(0.3)
-propertyTumor.SetDiffuse(0.6)
-propertyTumor.SetSpecular(0.1)
+# propertyTumor.ShadeOn()
+# propertyTumor.SetAmbient(0.3)
+# propertyTumor.SetDiffuse(0.6)
+# propertyTumor.SetSpecular(0.1)
 
 mapperTumor = vtk.vtkSmartVolumeMapper()
 mapperTumor.SetInputConnection(reader2.GetOutputPort())
@@ -265,7 +274,6 @@ mapperTumor.SetInputConnection(reader2.GetOutputPort())
 volumeTumor = vtk.vtkVolume()
 volumeTumor.SetProperty(propertyTumor)
 volumeTumor.SetMapper(mapperTumor)
-
 
 renderer.AddVolume(volume)
 renderer.AddVolume(volumeTumor)
