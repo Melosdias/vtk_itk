@@ -63,9 +63,18 @@ crop1.SetLowerBoundaryCropSize([0, 0, 0])
 crop1.SetUpperBoundaryCropSize([0, y_offset, 0])
 crop1.Update()
 
-itk.imwrite(crop1, "cropped_case6_gre1.nrrd")
-
 cropped_smoothed_image1 = crop1.GetOutput()
+
+in_type_cropped1 = itk.output(crop1)
+output_type_cropped1 = itk.Image[itk.UC, cropped_smoothed_image1.GetImageDimension()]
+cropped_rescaler1 = itk.RescaleIntensityImageFilter[in_type_cropped1, output_type_cropped1].New(Input=crop1)
+cropped_rescaler1.SetOutputMinimum(0)
+cropped_rescaler1.SetOutputMaximum(255)
+cropped_rescaler1.Update()
+
+cropped_output_filepath1 = "cropped_case6_gre1.nrrd"
+itk.imwrite(cropped_rescaler1, cropped_output_filepath1)
+
 cropped_smoothed_image_array1 = itk.GetArrayViewFromImage(cropped_smoothed_image1)
 
 # Second set of images
@@ -88,7 +97,8 @@ cropped_smoothed_image2 = crop2.GetOutput()
 cropped_smoothed_image_array2 = itk.GetArrayViewFromImage(cropped_smoothed_image2)
 
 print(cropped_smoothed_image_array1.shape, cropped_smoothed_image_array2.shape)
-assert (cropped_smoothed_image_array1.shape == cropped_smoothed_image_array2.shape)
+assert cropped_smoothed_image_array1.shape == cropped_smoothed_image_array2.shape, "Image array dimensions don't match after cropping!"
+assert cropped_smoothed_image1.GetBufferedRegion().GetSize() == cropped_smoothed_image2.GetBufferedRegion().GetSize(), "Image dimensions don't match after cropping!"
 
 # User interaction part
 
@@ -220,7 +230,7 @@ itk.imwrite(segmentation_image_rescaler1, output_filepath1)
 
 # Segmentation image 2
 
-initial_value2 = cropped_smoothed_image2.GetPixel((seedX, seedY, seedZ))
+initial_value2 = cropped_smoothed_image2.GetPixel((seedX, seedY + y_offset, seedZ))
 lower2 = initial_value2 - 10
 upper2 = initial_value2 + 30
 
@@ -233,7 +243,7 @@ connected_threshold2.SetReplaceValue(255)
 connected_threshold2.SetLower(lower2)
 connected_threshold2.SetUpper(upper2)
 
-connected_threshold2.SetSeed((seedX, seedY, seedZ))
+connected_threshold2.SetSeed((seedX, seedY + y_offset, seedZ))
 connected_threshold2.Update()
 
 dimension2 = input_image2.GetImageDimension()
@@ -291,7 +301,7 @@ plt.show()
 
 # VTK part
 
-# Affichage
+# 3D Display
 
 import vtk
 
@@ -354,10 +364,10 @@ propertyTumor.SetColor(colorTumor)
 propertyTumor.SetScalarOpacity(opacityTumor)
 propertyTumor.SetInterpolationTypeToLinear()
 
-# propertyTumor.ShadeOn()
-# propertyTumor.SetAmbient(0.3)
-# propertyTumor.SetDiffuse(0.6)
-# propertyTumor.SetSpecular(0.1)
+propertyTumor.ShadeOn()
+propertyTumor.SetAmbient(0.3)
+propertyTumor.SetDiffuse(0.6)
+propertyTumor.SetSpecular(0.1)
 
 mapperTumor = vtk.vtkSmartVolumeMapper()
 mapperTumor.SetInputConnection(reader2.GetOutputPort())
